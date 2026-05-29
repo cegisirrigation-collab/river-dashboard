@@ -1,0 +1,828 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>River Monitoring Dashboard - Grouped Station Sequence</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+
+<style>
+/* ================= GLOBAL ROOT THEMES ================= */
+:root {
+    --green: #00e676;  
+    --yellow: #ffd400; 
+    --amber: #ff9100;  
+    --red: #ff1744;    
+    --cyan: #11dfff;
+    
+    /* NIGHT MODE PROFILE */
+    --bg-gradient: radial-gradient(circle at center, #07356d 0%, #010814 100%);
+    --card-bg: linear-gradient(to bottom, #051b39, #021123);
+    --card-border: #1f8fff;
+    --text-color: #ffffff;
+    --header-bg: linear-gradient(to right, #031329, #0a3a73);
+    --panel-divider: rgba(255, 255, 255, 0.15);
+    --box-bg: rgba(0, 15, 40, 0.6);
+    --box-border: #003a75;
+    --sub-text: #8fa7c1;
+    --shadow-preset: 0 0 25px rgba(255,255,255,.35);
+    --gauge-empty-arc: #576574;
+}
+
+/* HIGH-CONTRAST DAY PROFILE */
+body.day-mode {
+    --bg-gradient: linear-gradient(to bottom, #eef2f7, #cfd8dc);
+    --card-bg: #ffffff;
+    --card-border: #0077ff;
+    --text-color: #000000;
+    --header-bg: linear-gradient(to right, #0044ff, #0011aa);
+    --panel-divider: rgba(0, 0, 0, 0.2);
+    --box-bg: #f0f4f8;
+    --box-border: #0055cc;
+    --sub-text: #37474f;
+    --shadow-preset: 0 6px 20px rgba(0, 0, 0, 0.2);
+    --gauge-empty-arc: #b0bec5;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', sans-serif;
+    background: var(--bg-gradient);
+    color: var(--text-color);
+    transition: background 1s ease, color 1s ease;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ================= ENLARGED HEADER RIBBON ================= */
+header {
+    height: 16vh; 
+    background: var(--header-bg);
+    border-bottom: 4px solid #0bbcff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    padding: 0 2vw;
+    transition: background 1s ease;
+}
+
+.header-icon {
+    position: absolute;
+    left: 2vw;
+    font-size: 5.5rem;
+    color: #fff;
+}
+
+.basin-title {
+    font-size: 7.5rem; 
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #fff;
+    text-shadow: 0 0 25px rgba(255,255,255,.4);
+    white-space: nowrap;
+    text-align: center;
+}
+
+.update-box {
+    position: absolute;
+    right: 2vw;
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    color: #fff;
+}
+
+.update-box i {
+    font-size: 3.2rem;
+    color: #ffd400;
+}
+
+.update-label {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+}
+
+.update-time {
+    font-size: 2.2rem;
+    font-weight: 900;
+    color: #ffd400;
+}
+
+/* ================= DASHBOARD CONTAINER ================= */
+#dashboard {
+    flex: 1;
+    padding: 2vh 2vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.card {
+    width: 100%;
+    height: 100%;
+    border-radius: 20px;
+    background: var(--card-bg);
+    border: 3px solid var(--card-border);
+    display: flex;
+    flex-direction: column;
+    padding: 2vh 2.5vw;
+    box-shadow: var(--shadow-preset);
+    transition: background 1s ease, border-color 1s ease;
+}
+
+/* ================= STATION CONTAINER ================= */
+.station-container {
+    text-align: center;
+    margin-bottom: 1vh;
+    min-height: 11vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.station-main-name {
+    font-size: 6rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-shadow: var(--shadow-preset);
+}
+
+.station-sub-name {
+    font-size: 2.6rem;
+    font-weight: 800;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-top: 5px;
+    color: var(--text-color);
+}
+
+/* ================= PANEL LAYOUTS ================= */
+.content {
+    flex: 1;
+    display: flex;
+    gap: 25px;
+}
+
+.left-panel {
+    width: 65%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    border-right: 3px solid var(--panel-divider);
+    padding-right: 25px;
+}
+
+/* ================= HIGH-LEGIBILITY SVG GAUGE ================= */
+.gauge-container {
+    position: relative;
+    width: 580px;  
+    height: 290px; 
+    margin-top: 5px;
+}
+
+.gauge-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.gauge-text {
+    font-size: 16px; 
+    font-weight: 900;
+    fill: #ffffff;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    text-transform: uppercase;
+}
+
+body.day-mode .gauge-text {
+    fill: #000000 !important;
+}
+
+.gauge-val-marker {
+    font-size: 20px; 
+    font-weight: 900;
+    text-shadow: 0 0 6px rgba(0,0,0,1), 0 0 12px rgba(0,0,0,1);
+}
+
+.gauge-needle-line {
+    stroke: #ff1744; 
+    stroke-width: 8; 
+    stroke-linecap: round;
+    transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.15); 
+    transform-origin: 290px 280px; 
+}
+
+body.day-mode .gauge-needle-line {
+    stroke: #000000; 
+}
+
+.gauge-pivot-circle {
+    fill: #1e293b;
+    stroke: #ffffff;
+    stroke-width: 5;
+}
+
+/* ================= WATER METRICS ================= */
+.water-level-label-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-top: 5px;
+}
+
+.water-level-label {
+    color: #00aaff;
+    font-size: 1.5rem;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    font-weight: 900;
+}
+
+body.day-mode .water-level-label {
+    color: #0044ff;
+}
+
+.trend-badge {
+    font-size: 1.3rem;
+    font-weight: 900;
+    padding: 6px 20px;
+    border-radius: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+.trend-raising {
+    background: #ff1744;
+    color: #ffffff;
+    border: 2px solid #ffffff;
+}
+.trend-reducing {
+    background: #00e676;
+    color: #000000;
+    border: 2px solid #000000;
+}
+.trend-stable {
+    background: rgba(128, 128, 128, 0.4);
+    color: var(--text-color);
+    border: 2px solid var(--text-color);
+}
+
+.water-level {
+    font-size: 9rem;
+    font-weight: 900;
+    line-height: 1;
+}
+
+.unit {
+    font-size: 2.8rem;
+    font-weight: 900;
+    margin-left: 10px;
+}
+
+/* ================= LEVEL ALERT DESIGNATIONS ================= */
+.normal-level { color: var(--green); }
+.alert-level { color: var(--yellow); text-shadow: 0 0 10px rgba(0,0,0,0.5); }
+.minor-level { color: var(--amber); }
+.major-level { color: var(--red); animation: blink 1s infinite; }
+.no-gauge-level { color: #888a8c; }
+
+body.day-mode .normal-level { color: #008f39; }
+body.day-mode .alert-level { color: #b58d00; }
+body.day-mode .minor-level { color: #d35400; }
+body.day-mode .major-level { color: #c0392b; }
+
+@keyframes blink {
+    0% { opacity: 1; }
+    50% { opacity: .2; }
+    100% { opacity: 1; }
+}
+
+/* ================= RIGHT PANEL WINDOWS ================= */
+.right-panel {
+    width: 35%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 20px;
+    height: 95%;
+    align-self: center;
+}
+
+.rain-box {
+    flex: 1;
+    width: 100%;
+    border-radius: 20px;
+    border: 3px solid var(--box-border);
+    background: var(--box-bg);
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    transition: background 1s ease, border-color 1s ease;
+}
+
+.rain-details {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.rain-title {
+    color: #00d2ff;
+    font-size: 1.7rem;
+    letter-spacing: 1px;
+    font-weight: 900;
+    text-transform: uppercase;
+}
+body.day-mode .rain-title {
+    color: #0044ff;
+}
+
+.rain-subtitle {
+    color: var(--sub-text);
+    font-size: 1.15rem;
+    font-weight: 800;
+    text-transform: uppercase;
+    margin-top: 3px;
+}
+
+.rain-icon {
+    font-size: 4.2rem;
+    color: #25d8ff;
+}
+body.day-mode .rain-icon {
+    color: #0055cc;
+}
+
+.rain-value-wrapper {
+    text-align: right;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.rain-value {
+    font-size: 5.2rem;
+    font-weight: 900;
+    color: #25d8ff;
+    line-height: 1;
+}
+body.day-mode .rain-value {
+    color: #000000;
+}
+
+.rain-unit {
+    font-size: 1.7rem;
+    font-weight: 800;
+    margin-top: 3px;
+    color: var(--sub-text);
+}
+
+/* ================= FOOTER ================= */
+footer {
+    height: 4vh;
+    background: #000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #3baeff;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+
+/* ================= DISPLAY RESPONSIBILITY BREAKPOINTS ================= */
+@media(max-width:1440px) {
+    .basin-title { font-size: 4.5rem; }
+    header { height: 14vh; }
+    .station-main-name { font-size: 4rem; }
+    .station-sub-name { font-size: 1.8rem; }
+    .station-container { min-height: 10vh; }
+    .water-level { font-size: 6.5rem; }
+    .rain-value { font-size: 4rem; }
+    .gauge-container { transform: scale(0.85); margin-top: -30px; height: 245px;}
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <div class="header-icon">
+        <i class="fa-solid fa-water"></i>
+    </div>
+    <div class="basin-title" id="basinTitleHeader">---</div>
+    <div class="update-box">
+        <i class="fa-regular fa-clock"></i>
+        <div>
+            <div class="update-label">UPDATE</div>
+            <div class="update-time" id="updateTime">--:--</div>
+        </div>
+    </div>
+</header>
+
+<div id="dashboard"></div>
+
+<footer>
+Developed by Irrigation Department, Sri Lanka
+</footer>
+
+<script>
+/* ================= THRESHOLDS REFERENCE DATA MAP ================= */
+const thresholds = {
+    "Hanwella":                  { alert: 7.0, minor: 8.0,  major: 10.0, maxScale: 12.0, unit: "m" },
+    "Glencourse":                { alert: 15.0, minor: 16.5, major: 19.0, maxScale: 22.0, unit: "m" },
+    "Nagalagam Street":          { alert: 4.0, minor: 5.0,  major: 7.0,  maxScale: 9.0,  unit: "ft" },
+    "Kithulgala":                { alert: 3.0, minor: 4.0,  major: 6.0,  maxScale: 8.0,  unit: "m" },
+    "Holombuwa":                 { alert: 3.0, minor: 3.4,  major: 5.0,  maxScale: 7.0,  unit: "m" },
+    "Deraniyagala":              { alert: 4.8, minor: 5.8,  major: 6.4,  maxScale: 8.0,  unit: "m" },
+    "Norwood":                   { alert: 1.5, minor: 3.0,  major: 4.5,  maxScale: 6.0,  unit: "m" },
+    "Putupaula":                 { alert: 3.0, minor: 4.0,  major: 5.0,  maxScale: 7.0,  unit: "m" },
+    "Ellagawa":                  { alert: 10.0, minor: 10.7, major: 12.2, maxScale: 15.0, unit: "m" },
+    "Rathnapura":                { alert: 5.2, minor: 7.5,  major: 9.5,  maxScale: 12.0, unit: "m" },
+    "Magura":                    { alert: 4.0, minor: 6.0,  major: 7.5,  maxScale: 10.0, unit: "m" },
+    "Kalawellawa (Millakanda)":  { alert: 5.0, minor: 6.5,  major: 8.0,  maxScale: 11.0, unit: "m" },
+    "Baddegama":                 { alert: 3.5, minor: 4.0,  major: 5.0,  maxScale: 7.0,  unit: "m" },
+    "Thawalama":                 { alert: 4.0, minor: 6.0,  major: 7.5,  maxScale: 10.0, unit: "m" },
+    "Thalgahagoda":              { alert: 1.4, minor: 1.7,  major: 2.8,  maxScale: 4.5,  unit: "m" },
+    "Panadugama":                { alert: 5.0, minor: 6.0,  major: 7.5,  maxScale: 10.0, unit: "m" },
+    "Pitabeddara":               { alert: 4.0, minor: 5.0,  major: 6.5,  maxScale: 9.0,  unit: "m" },
+    "Urawa":                     { alert: 2.5, minor: 4.0,  major: 6.0,  maxScale: 8.0,  unit: "m" },
+    "Manampitiya":               { alert: 3.0, minor: 4.3,  major: 6.0,  maxScale: 8.5,  unit: "m" },
+    "Peradeniya":                { alert: 5.0, minor: 7.0,  major: 9.0,  maxScale: 12.0, unit: "m" },
+    "Nawalapitiya":              { alert: 3.5, minor: 5.0,  major: 6.0,  maxScale: 8.5,  unit: "m" },
+    "Weraganthota":              { alert: 5.0, minor: 6.0,  major: 8.0,  maxScale: 11.0, unit: "m" },
+    "Thaldena":                  { alert: 3.0, minor: 4.0,  major: 5.0,  maxScale: 7.5,  unit: "m" },
+    "Thanamalwila":              { alert: 4.0, minor: 5.0,  major: 5.5,  maxScale: 7.5,  unit: "m" },
+    "Wellawaya":                 { alert: 4.4, minor: 5.4,  major: 5.9,  maxScale: 8.0,  unit: "m" },
+    "Moragaswewa":               { alert: 4.75, minor: 6.0, major: 7.0,  maxScale: 9.5,  unit: "m" },
+    "Badalgama":                 { alert: 5.0, minor: 6.2,  major: 9.6,  maxScale: 12.0, unit: "m" },
+    "Dunamale":                  { alert: 3.3, minor: 4.4,  major: 5.5,  maxScale: 7.5,  unit: "m" },
+    "Moraketiya":                { alert: 3.0, minor: 5.0,  major: 7.0,  maxScale: 9.5,  unit: "m" },
+    "Kuda Oya":                  { alert: 6.9, minor: 8.4,  major: 8.8,  maxScale: 11.0, unit: "m" },
+    "Katharagama":               { alert: 4.0, minor: 4.6,  major: 6.5,  maxScale: 8.5,  unit: "m" },
+    "Nakkala":                   { alert: 5.0, minor: 6.0,  major: 7.5,  maxScale: 10.0, unit: "m" },
+    "Siyambalanduwa":            { alert: 4.5, minor: 6.0,  major: 7.0,  maxScale: 9.5,  unit: "m" },
+    "Padiyathalawa":             { alert: 4.0, minor: 4.5,  major: 6.0,  maxScale: 8.5,  unit: "m" },
+    "Horowpothana":              { alert: 6.0, minor: 7.5,  major: 10.5, maxScale: 14.0, unit: "m" },
+    "Yaka Wewa":                 { alert: 4.0, minor: 5.0,  major: 6.0,  maxScale: 8.5,  unit: "m" },
+    "Thanthirimale":             { alert: 5.0, minor: 6.8,  major: 7.8,  maxScale: 10.5, unit: "m" },
+    "Galgamuwa":                 { alert: 4.84, minor: 5.94, major: 8.0, maxScale: 11.0, unit: "m" },
+    "Giriulla":                  { alert: 5.5, minor: 6.5,  major: 7.5,  maxScale: 10.0, unit: "m" }
+};
+
+const API_URL = "https://services3.arcgis.com/J7ZFXmR8rSmQ3FGf/arcgis/rest/services/survey123_72977f4e45c2412f8bc7bcd5d9db0c7a_stakeholder/FeatureServer/0/query?where=1%3D1&outFields=basin,gauge,water_level,rain_fall,EditDate&orderByFields=EditDate DESC&f=pjson";
+
+let stationsData = [];     
+let historicalRaw = [];    
+let currentSlide = 0;
+
+/* ================= ENVIRONMENT AUTOMATION DAY/NIGHT CHRONO ENGINE ================= */
+function checkDayNightProfile() {
+    const currentHour = new Date().getHours();
+    if (currentHour >= 6 && currentHour < 18) {
+        if (!document.body.classList.contains("day-mode")) {
+            document.body.classList.add("day-mode");
+        }
+    } else {
+        if (document.body.classList.contains("day-mode")) {
+            document.body.classList.remove("day-mode");
+        }
+    }
+}
+
+/* ================= LIVE API DATA EXTRACTION WITH BASIN SORTING LOGIC ================= */
+async function loadData(){
+    checkDayNightProfile();
+    try {
+        const response = await fetch(API_URL + "&_t=" + Date.now());
+        const data = await response.json();
+
+        if(!data.features || data.features.length === 0) return;
+
+        historicalRaw = data.features; 
+
+        // Extract latest record per unique gauge
+        const latestStations = {};
+        data.features.forEach(f => {
+            const a = f.attributes;
+            if(!a.basin || !a.gauge) return;
+
+            let gaugeName = a.gauge.trim();
+
+            if (gaugeName.toLowerCase() === "pera" || gaugeName.toLowerCase() === "peradeniya") {
+                gaugeName = "Peradeniya";
+                a.gauge = "Peradeniya";
+            }
+
+            if(!latestStations[gaugeName] || a.EditDate > latestStations[gaugeName].EditDate){
+                latestStations[gaugeName] = a;
+            }
+        });
+
+        // Convert mapped records into a structured array
+        let rawList = Object.values(latestStations);
+
+        /* ================= SORTING ALGORITHM: BASIN -> ALL STATIONS ================= */
+        rawList.sort((a, b) => {
+            // Clean names to guarantee structured string sorting comparisons
+            const basinA = a.basin.replace(/basin/gi, "").trim().toLowerCase();
+            const basinB = b.basin.replace(/basin/gi, "").trim().toLowerCase();
+            
+            if (basinA !== basinB) {
+                return basinA.localeCompare(basinB); // Alphabetical ordering of river basins
+            }
+            
+            // If the basin name is the same, group secondary sort alphabetically by gauge station names
+            return a.gauge.trim().localeCompare(b.gauge.trim());
+        });
+
+        stationsData = rawList;
+
+        if(stationsData.length > 0){
+            const latest = new Date(data.features[0].attributes.EditDate);
+            document.getElementById("updateTime").innerText = latest.toLocaleTimeString("en-GB");
+        }
+        renderSlide();
+    } catch(err) {
+        console.error("Data fetch failure:", err);
+    }
+}
+
+/* ================= ARC MATH VECTOR LOGIC ================= */
+function describeArc(x, y, radius, startAngle, endAngle){
+    const start = polarToCartesian(x, y, radius, endAngle);
+    const end = polarToCartesian(x, y, radius, startAngle);
+    const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+    return [
+        "M", start.x, start.y, 
+        "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y
+    ].join(" ");
+}
+
+function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+    const angleInRadians = (angleInDegrees-90) * Math.PI / 180.0;
+    return {
+        x: centerX + (radius * Math.cos(angleInRadians)),
+        y: centerY + (radius * Math.sin(angleInRadians))
+    };
+}
+
+/* ================= SLIDE PROCESSING & LAYOUT RENDERING ================= */
+function renderSlide(){
+    if(stationsData.length === 0) return;
+
+    const st = stationsData[currentSlide];
+    
+    // Sanitize basin text cleanly out for extra design footprint layout space 
+    let cleanRiverName = st.basin.replace(/basin/gi, "").trim();
+    document.getElementById("basinTitleHeader").innerText = cleanRiverName;
+
+    let lookupKey = st.gauge;
+    if (st.gauge.includes("Kalawellawa")) {
+        lookupKey = "Kalawellawa (Millakanda)";
+    }
+
+    const hasGauge = thresholds.hasOwnProperty(lookupKey);
+    const th = thresholds[lookupKey] || { alert: 0, minor: 0, major: 0, maxScale: 10.0, unit: "m" };
+
+    let levelClass = "normal-level";
+    if (!hasGauge) {
+        levelClass = "no-gauge-level";
+    } else if(th.major > 0 && st.water_level >= th.major){
+        levelClass = "major-level";
+    } else if(th.minor > 0 && st.water_level >= th.minor){
+        levelClass = "minor-level";
+    } else if(th.alert > 0 && st.water_level >= th.alert){
+        levelClass = "alert-level";
+    }
+
+    /* ===== STATION CONTAINER SPLITS ===== */
+    let mainStationHTML = `<div class="station-main-name ${levelClass}">${st.gauge}</div>`;
+    if (st.gauge.includes("Kalawellawa")) {
+        mainStationHTML = `
+            <div class="station-main-name ${levelClass}">Kallawellawa</div>
+            <div class="station-sub-name">Millakanda</div>
+        `;
+    }
+
+    /* ===== VECTOR METRIC CALCULATIONS ===== */
+    const maxVal = th.maxScale;
+    const cx = 290; 
+    const cy = 280; 
+    const arcRadius = 205; 
+
+    const angAlert = hasGauge ? (-90 + (th.alert / maxVal) * 180) : -45;
+    const angMinor = hasGauge ? (-90 + (th.minor / maxVal) * 180) : 0;
+    const angMajor = hasGauge ? (-90 + (th.major / maxVal) * 180) : 45;
+    
+    const pct = Math.min(Math.max(st.water_level / maxVal, 0), 1);
+    const needleAngle = hasGauge ? (-90 + (pct * 180)) : -90; 
+
+    const midNormal = (-90 + angAlert) / 2;
+    const midAlert  = (angAlert + angMinor) / 2;
+    const midMinor  = (angMinor + angMajor) / 2;
+    const midMajor  = (angMajor + 90) / 2;
+
+    const pNormal = polarToCartesian(cx, cy, arcRadius, midNormal);
+    const pAlert  = polarToCartesian(cx, cy, arcRadius, midAlert);
+    const pMinor  = polarToCartesian(cx, cy, arcRadius, midMinor);
+    const pMajor  = polarToCartesian(cx, cy, arcRadius, midMajor);
+
+    const lineAlert = polarToCartesian(cx, cy, 255, angAlert);
+    const lineMinor = polarToCartesian(cx, cy, 255, angMinor);
+    const lineMajor = polarToCartesian(cx, cy, 255, angMajor);
+
+    /* ===== WATER LEVEL VARIATION DELTA TREND ENGINE ===== */
+    let trendHTML = `<span class="trend-badge trend-stable">■ Stable</span>`;
+    
+    if (hasGauge) {
+        const matchingHistory = historicalRaw
+            .filter(f => {
+                let name = f.attributes.gauge ? f.attributes.gauge.trim() : "";
+                if (name.toLowerCase() === "pera" || name.toLowerCase() === "peradeniya") name = "Peradeniya";
+                return name === st.gauge;
+            })
+            .sort((a, b) => b.attributes.EditDate - a.attributes.EditDate); 
+
+        if (matchingHistory.length > 1) {
+            const previousWaterLevel = matchingHistory[1].attributes.water_level;
+            const currentWaterLevel = st.water_level;
+            
+            if (currentWaterLevel > previousWaterLevel) {
+                trendHTML = `<span class="trend-badge trend-raising"><i class="fa-solid fa-arrow-trend-up"></i> Raising</span>`;
+            } else if (currentWaterLevel < previousWaterLevel) {
+                trendHTML = `<span class="trend-badge trend-reducing"><i class="fa-solid fa-arrow-trend-down"></i> Reducing</span>`;
+            }
+        }
+    }
+
+    /* ===== CALCULATE HISTORICAL RAINFALL WINDOWS ===== */
+    let hourlyRainDisplay = "0.0";
+    let dailyRainDisplay = "0.0";
+
+    const isNagalagam = st.gauge.toLowerCase().includes("nagalagam");
+
+    if (st.rain_fall === undefined || st.rain_fall === null || st.rain_fall === "" || Number(st.rain_fall) < 0 || isNagalagam) {
+        hourlyRainDisplay = "NA";
+        dailyRainDisplay = "NA";
+    } else {
+        hourlyRainDisplay = Number(st.rain_fall) === 0 ? "0.0" : Number(st.rain_fall).toFixed(1);
+
+        let rainSum24h = 0;
+        const currentStationTime = st.EditDate;
+        const indexCutoff24h = currentStationTime - (24 * 60 * 60 * 1000);
+
+        historicalRaw.forEach(f => {
+            const histAttr = f.attributes;
+            let histName = histAttr.gauge ? histAttr.gauge.trim() : "";
+            if (histName.toLowerCase() === "pera" || histName.toLowerCase() === "peradeniya") {
+                histName = "Peradeniya";
+            }
+
+            if (histName === st.gauge && histAttr.EditDate > indexCutoff24h && histAttr.EditDate <= currentStationTime) {
+                if (histAttr.rain_fall !== undefined && histAttr.rain_fall !== null && Number(histAttr.rain_fall) >= 0) {
+                    rainSum24h += Number(histAttr.rain_fall);
+                }
+            }
+        });
+        dailyRainDisplay = rainSum24h === 0 ? "0.0" : rainSum24h.toFixed(1);
+    }
+
+    /* ===== WATER GAUGE DISPLAY GENERATION ===== */
+    let waterLevelDisplay = Number(st.water_level).toFixed(2);
+    let unitDisplay = `<span class="unit">${th.unit}</span>`;
+    
+    if(!hasGauge) {
+        waterLevelDisplay = "No Gauge";
+        unitDisplay = "";
+        trendHTML = ""; 
+    }
+
+    document.getElementById("dashboard").innerHTML = `
+    <div class="card">
+        <div class="station-container">
+            ${mainStationHTML}
+        </div>
+        
+        <div class="content">
+            <div class="left-panel">
+                
+                <div class="gauge-container">
+                    <svg class="gauge-svg" viewBox="0 0 580 290">
+                        <path d="${describeArc(cx, cy, arcRadius, -90, angAlert)}" fill="none" stroke="${hasGauge ? 'var(--green)' : 'var(--gauge-empty-arc)'}" stroke-width="75"/>
+                        <path d="${describeArc(cx, cy, arcRadius, angAlert, angMinor)}" fill="none" stroke="${hasGauge ? 'var(--yellow)' : 'var(--gauge-empty-arc)'}" stroke-width="75"/>
+                        <path d="${describeArc(cx, cy, arcRadius, angMinor, angMajor)}" fill="none" stroke="${hasGauge ? 'var(--amber)' : 'var(--gauge-empty-arc)'}" stroke-width="75"/>
+                        <path d="${describeArc(cx, cy, arcRadius, angMajor, 90)}" fill="none" stroke="${hasGauge ? 'var(--red)' : 'var(--gauge-empty-arc)'}" stroke-width="75"/>
+
+                        ${hasGauge ? `
+                        <line x1="${cx}" y1="${cy}" x2="${lineAlert.x}" y2="${lineAlert.y}" stroke="#000000" stroke-width="3" stroke-dasharray="4,4"/>
+                        <text x="${lineAlert.x}" y="${lineAlert.y - 15}" class="gauge-text gauge-val-marker" fill="var(--green)">${th.alert.toFixed(1)}</text>
+                        
+                        <line x1="${cx}" y1="${cy}" x2="${lineMinor.x}" y2="${lineMinor.y}" stroke="#000000" stroke-width="3" stroke-dasharray="4,4"/>
+                        <text x="${lineMinor.x}" y="${lineMinor.y - 18}" class="gauge-text gauge-val-marker" fill="var(--yellow)">${th.minor.toFixed(1)}</text>
+                        
+                        <line x1="${cx}" y1="${cy}" x2="${lineMajor.x}" y2="${lineMajor.y}" stroke="#000000" stroke-width="3" stroke-dasharray="4,4"/>
+                        <text x="${lineMajor.x}" y="${lineMajor.y - 15}" class="gauge-text gauge-val-marker" fill="var(--amber)">${th.major.toFixed(1)}</text>
+                        ` : ''}
+
+                        <text x="${pNormal.x}" y="${pNormal.y}" class="gauge-text">${hasGauge ? 'Normal' : 'N/A'}</text>
+                        <text x="${pAlert.x}" y="${pAlert.y}" class="gauge-text">${hasGauge ? 'Alert' : 'N/A'}</text>
+                        <text x="${pMinor.x}" y="${pMinor.y}" class="gauge-text">${hasGauge ? 'Minor' : 'N/A'}</text>
+                        <text x="${pMajor.x}" y="${pMajor.y}" class="gauge-text">${hasGauge ? 'Major' : 'N/A'}</text>
+
+                        <line x1="${cx}" y1="${cy}" x2="${cx}" y2="35" class="gauge-needle-line" style="transform: rotate(${needleAngle}deg);"/>
+                        <circle cx="${cx}" cy="${cy}" r="15" class="gauge-pivot-circle"/>
+                    </svg>
+                </div>
+
+                <div class="water-level-label-wrapper">
+                    <div class="water-level-label">Water Level Status</div>
+                    ${trendHTML}
+                </div>
+                <div class="water-level ${levelClass}">
+                    ${waterLevelDisplay}${unitDisplay}
+                </div>
+            </div>
+
+            <div class="right-panel">
+                <div class="rain-box">
+                    <div class="rain-details">
+                        <div class="rain-title">Rainfall</div>
+                        <div class="rain-subtitle">Hourly Value</div>
+                    </div>
+                    <div class="rain-icon">
+                        <i class="fa-solid fa-cloud-sun-rain"></i>
+                    </div>
+                    <div class="rain-value-wrapper">
+                        <span class="rain-value">${hourlyRainDisplay}</span>
+                        ${hourlyRainDisplay !== "NA" ? `<span class="rain-unit">mm</span>` : ""}
+                    </div>
+                </div>
+
+                <div class="rain-box">
+                    <div class="rain-details">
+                        <div class="rain-title">Rainfall</div>
+                        <div class="rain-subtitle">Last 24 Hours</div>
+                    </div>
+                    <div class="rain-icon">
+                        <i class="fa-solid fa-cloud-showers-heavy"></i>
+                    </div>
+                    <div class="rain-value-wrapper">
+                        <span class="rain-value">${dailyRainDisplay}</span>
+                        ${dailyRainDisplay !== "NA" ? `<span class="rain-unit">mm</span>` : ""}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+    currentSlide = (currentSlide + 1) % stationsData.length;
+}
+
+/* ================= ROTATION METRONOME ENGINE ================= */
+function startSlider(){
+    if(stationsData.length === 0){
+        setTimeout(startSlider, 5000);
+        return;
+    }
+
+    renderSlide();
+    
+    const currentStation = stationsData[currentSlide];
+    let interval = 5000;
+    if(currentStation && currentStation.gauge.toLowerCase().includes("nagalagam")){
+        interval = 10000;
+    }
+    
+    setTimeout(startSlider, interval);
+}
+
+/* ================= INITIALIZATION LOOPS ================= */
+loadData();
+setInterval(loadData, 60000); 
+setTimeout(startSlider, 3000);
+</script>
+
+</body>
+</html>
