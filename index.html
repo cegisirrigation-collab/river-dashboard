@@ -1,0 +1,894 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>River Monitoring Dashboard - 4-Day Analytics Overlay</title>
+
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"/>
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+<style>
+/* ================= GLOBAL HIGH-CONTRAST ROOT THEMES ================= */
+:root {
+    --green: #00e676;  
+    --yellow: #ffd400; 
+    --amber: #ff9100;  
+    --red: #ff1744;    
+    --cyan: #11dfff;
+    
+    /* NIGHT PROFILE */
+    --bg-gradient: radial-gradient(circle at center, #07356d 0%, #010814 100%);
+    --card-bg: linear-gradient(to bottom, #051b39, #021123);
+    --card-border: #1f8fff;
+    --text-color: #ffffff;
+    --header-bg: linear-gradient(to right, #031329, #0a3a73);
+    --panel-divider: rgba(255, 255, 255, 0.2);
+    --box-bg: rgba(0, 15, 40, 0.7);
+    --box-border: #004fb0;
+    --sub-text: #a3c1e0;
+    --shadow-preset: 0 0 30px rgba(0, 170, 255, 0.4);
+    --gauge-empty-arc: #4a5568;
+    
+    --th-txt-normal: #00e676;
+    --th-txt-alert: #ffd400;
+    --th-txt-minor: #ff9100;
+    --th-txt-major: #ff1744;
+    --th-bg-badge: rgba(0, 0, 0, 0.6);
+}
+
+body.day-mode {
+    --bg-gradient: linear-gradient(to bottom, #e4e9f0, #bcc5cf);
+    --card-bg: #ffffff;
+    --card-border: #005bc4;
+    --text-color: #000000;
+    --header-bg: linear-gradient(to right, #003cd1, #000c8a);
+    --panel-divider: rgba(0, 0, 0, 0.3);
+    --box-bg: #ebf1f6;
+    --box-border: #004ac2;
+    --sub-text: #2c3e50;
+    --shadow-preset: 0 10px 30px rgba(0, 0, 0, 0.25);
+    --gauge-empty-arc: #94a3b8;
+    
+    --th-txt-normal: #000000;
+    --th-txt-alert: #000000;
+    --th-txt-minor: #000000;
+    --th-txt-major: #ffffff;
+    --th-bg-badge: #ffffff; 
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+html, body {
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    font-family: 'Segoe UI', -apple-system, sans-serif;
+    background: var(--bg-gradient);
+    color: var(--text-color);
+    transition: background 0.5s ease, color 0.5s ease;
+}
+
+body {
+    display: flex;
+    flex-direction: column;
+}
+
+/* ================= HEADER RIBBON ================= */
+header {
+    height: 12vh; 
+    background: var(--header-bg);
+    border-bottom: 5px solid #00bfff;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+    padding: 0 2vw;
+}
+
+.header-icon {
+    position: absolute;
+    left: 2.5vw;
+    font-size: 4rem;
+    color: #fff;
+}
+
+.basin-title {
+    font-size: 5.5rem; 
+    font-weight: 900;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #fff;
+    text-shadow: 0 4px 15px rgba(0,0,0,0.6);
+}
+
+.update-box {
+    position: absolute;
+    right: 2.5vw;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: #fff;
+}
+
+.update-box i {
+    font-size: 2.8rem;
+    color: #ffd400;
+}
+
+.update-label {
+    font-size: 1rem;
+    font-weight: 800;
+}
+
+.update-time {
+    font-size: 2rem;
+    font-weight: 900;
+    color: #ffd400;
+}
+
+/* ================= LAYOUT SLOTS ================= */
+#dashboard {
+    flex: 1;
+    padding: 1.5vh 1.5vw;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.card {
+    width: 100%;
+    height: 100%;
+    border-radius: 24px;
+    background: var(--card-bg);
+    border: 4px solid var(--card-border);
+    display: flex;
+    flex-direction: column;
+    padding: 2vh 2vw;
+    box-shadow: var(--shadow-preset);
+}
+
+.station-container {
+    text-align: center;
+    margin-bottom: 1vh;
+    min-height: 8vh;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+}
+
+.station-main-name {
+    font-size: 5rem;
+    font-weight: 900;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.station-sub-name {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-top: 2px;
+    text-transform: uppercase;
+}
+
+/* ================= TWO COMPONENT SPLIT LAYOUT ================= */
+.content {
+    flex: 1;
+    display: flex;
+    gap: 30px;
+    min-height: 0;
+}
+
+/* LEFT HOUSING: SPEEDOMETER & TEXT STATS */
+.left-block {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: center;
+    border-right: 4px solid var(--panel-divider);
+    padding-right: 30px;
+}
+
+.gauge-container {
+    position: relative;
+    width: 540px;  
+    height: 270px; 
+}
+
+.gauge-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.gauge-text {
+    font-size: 15px; 
+    font-weight: 900;
+    fill: #ffffff;
+    text-anchor: middle;
+    dominant-baseline: middle;
+    text-transform: uppercase;
+}
+
+body.day-mode .gauge-text { fill: #000000 !important; }
+
+.gauge-bg-badge {
+    fill: var(--th-bg-badge);
+    stroke: var(--text-color);
+    stroke-width: 1.5;
+    rx: 5px;   ry: 5px;
+}
+
+.gauge-val-marker { font-size: 19px; font-weight: 950; }
+
+.gauge-needle-line {
+    stroke: #ff1744; 
+    stroke-width: 9; 
+    stroke-linecap: round;
+    transition: transform 0.8s cubic-bezier(0.175, 0.885, 0.32, 1.15); 
+    transform-origin: 270px 260px; 
+}
+body.day-mode .gauge-needle-line { stroke: #000000; }
+
+.gauge-pivot-circle { fill: #111827; stroke: #ffffff; stroke-width: 5; }
+
+.water-level-data-block {
+    text-align: center;
+    margin-top: 5px;
+}
+
+.water-level-label-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+    justify-content: center;
+}
+
+.water-level-label {
+    color: #00bfff;
+    font-size: 1.5rem;
+    text-transform: uppercase;
+    font-weight: 900;
+}
+body.day-mode .water-level-label { color: #0046e0; }
+
+.trend-badge {
+    font-size: 1.2rem;
+    font-weight: 900;
+    padding: 4px 15px;
+    border-radius: 8px;
+    text-transform: uppercase;
+}
+.trend-raising { background: #ff1744; color: #ffffff; border: 2px solid #ffffff; }
+.trend-reducing { background: #00e676; color: #000000; border: 2px solid #000000; }
+.trend-stable { background: rgba(128, 128, 128, 0.4); color: var(--text-color); border: 2px solid var(--text-color); }
+
+.water-level {
+    font-size: 7.5rem;
+    font-weight: 900;
+    line-height: 1;
+    margin-top: 2px;
+}
+.unit { font-size: 2.5rem; font-weight: 900; margin-left: 8px; }
+
+/* RIGHT HOUSING: ANALYTIC TIMELINE & RAINFALL PLOTS */
+.right-block {
+    width: 50%;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    gap: 15px;
+}
+
+/* THE TREND GRAPH BOX */
+.graph-container-box {
+    flex: 1;
+    width: 100%;
+    border-radius: 20px;
+    border: 4px solid var(--box-border);
+    background: var(--box-bg);
+    padding: 15px 20px;
+    position: relative;
+    min-height: 0; 
+}
+
+/* HORIZONTAL RAINFALL PANELS */
+.bottom-rain-row {
+    display: flex;
+    width: 100%;
+    justify-content: space-between;
+    gap: 15px;
+    height: 16vh;
+}
+
+.rain-box {
+    width: 49%;
+    height: 100%;
+    border-radius: 20px;
+    border: 4px solid var(--box-border);
+    background: var(--box-bg);
+    display: flex;
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 25px;
+}
+
+.rain-details { display: flex; flex-direction: column; }
+.rain-title { color: #11dfff; font-size: 1.6rem; font-weight: 900; text-transform: uppercase; }
+body.day-mode .rain-title { color: #0046e0; }
+.rain-subtitle { color: var(--sub-text); font-size: 1.1rem; font-weight: 800; text-transform: uppercase; }
+
+.rain-icon { font-size: 3.5rem; color: #11dfff; opacity: 0.8; }
+body.day-mode .rain-icon { color: #0053d6; }
+
+.rain-value-wrapper { text-align: right; }
+.rain-value { font-size: 4.8rem; font-weight: 950; color: #11dfff; line-height: 1; }
+body.day-mode .rain-value { color: #000000; }
+.rain-unit { font-size: 1.5rem; font-weight: 800; color: var(--sub-text); }
+
+/* STATUS ALERTS */
+.normal-level { color: var(--green); }
+.alert-level { color: var(--yellow); }
+.minor-level { color: var(--amber); }
+.major-level { color: var(--red); animation: blink 1s infinite; }
+.no-gauge-level { color: #8a99ad; }
+
+body.day-mode .normal-level { color: #009e32; }
+body.day-mode .alert-level { color: #cc9600; }
+body.day-mode .minor-level { color: #d65900; }
+body.day-mode .major-level { color: #cc0025; }
+
+@keyframes blink { 0% { opacity: 1; } 50% { opacity: .3; } 100% { opacity: 1; } }
+
+footer {
+    height: 4vh;
+    background: #000000;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    color: #3baeff;
+    font-size: 1.2rem;
+    font-weight: 800;
+}
+</style>
+</head>
+
+<body>
+
+<header>
+    <div class="header-icon"><i class="fa-solid fa-water"></i></div>
+    <div class="basin-title" id="basinTitleHeader">---</div>
+    <div class="update-box">
+        <i class="fa-regular fa-clock"></i>
+        <div>
+            <div class="update-label">UPDATE</div>
+            <div class="update-time" id="updateTime">--:--</div>
+        </div>
+    </div>
+</header>
+
+<div id="dashboard">
+    <div class="card" style="justify-content:center; align-items:center;">
+        <h2 style="font-size:3rem; font-weight:900; color:#11dfff;">SYNCHRONIZING TELEMETRY STREAM...</h2>
+    </div>
+</div>
+
+<footer>Developed by Irrigation Department, Sri Lanka</footer>
+
+<script>
+/* ================= SYSTEM DATA STORAGE ARCHITECTURE ================= */
+const thresholds = {
+    "Hanwella":                  { alert: 7.0, minor: 8.0,  major: 10.0, maxScale: 12.0, unit: "m" },
+    "Glencourse":                { alert: 15.0, minor: 16.5, major: 19.0, maxScale: 22.0, unit: "m" },
+    "Nagalagam Street":          { alert: 4.0, minor: 5.0,  major: 7.0,  maxScale: 9.0,  unit: "ft" },
+    "Kithulgala":                { alert: 3.0, minor: 4.0,  major: 6.0,  maxScale: 8.0,  unit: "m" },
+    "Holombuwa":                 { alert: 3.0, minor: 3.4,  major: 5.0,  maxScale: 7.0,  unit: "m" },
+    "Deraniyagala":              { alert: 4.8, minor: 5.8,  major: 6.4,  maxScale: 8.0,  unit: "m" },
+    "Norwood":                   { alert: 1.5, minor: 3.0,  major: 4.5,  maxScale: 6.0,  unit: "m" },
+    "Putupaula":                 { alert: 3.0, minor: 4.0,  major: 5.0,  maxScale: 7.0,  unit: "m" },
+    "Ellagawa":                  { alert: 10.0, minor: 10.7, major: 12.2, maxScale: 15.0, unit: "m" },
+    "Rathnapura":                { alert: 5.2, minor: 7.5,  major: 9.5,  maxScale: 12.0, unit: "m" },
+    "Magura":                    { alert: 4.0, minor: 6.0,  major: 7.5,  maxScale: 10.0, unit: "m" },
+    "Kalawellawa (Millakanda)":  { alert: 5.0, minor: 6.5,  major: 8.0,  maxScale: 11.0, unit: "m" },
+    "Baddegama":                 { alert: 3.5, minor: 4.0,  major: 5.0,  maxScale: 7.0,  unit: "m" },
+    "Thawalama":                 { alert: 4.0, minor: 6.0,  major: 7.5,  maxScale: 10.0, unit: "m" },
+    "Thalgahagoda":              { alert: 1.4, minor: 1.7,  major: 2.8,  maxScale: 4.5,  unit: "m" },
+    "Panadugama":                { alert: 5.0, minor: 6.0,  major: 7.5,  maxScale: 10.0, unit: "m" },
+    "Pitabeddara":               { alert: 4.0, minor: 5.0,  major: 6.5,  maxScale: 9.0,  unit: "m" },
+    "Urawa":                     { alert: 2.5, minor: 4.0,  major: 6.0,  maxScale: 8.0,  unit: "m" },
+    "Manampitiya":               { alert: 3.0, minor: 4.3,  major: 6.0,  maxScale: 8.5,  unit: "m" },
+    "Peradeniya":                { alert: 5.0, minor: 7.0,  major: 9.0,  maxScale: 12.0, unit: "m" },
+    "Nawalapitiya":              { alert: 3.5, minor: 5.0,  major: 6.0,  maxScale: 8.5,  unit: "m" },
+    "Weraganthota":              { alert: 5.0, minor: 6.0,  major: 8.0,  maxScale: 11.0, unit: "m" },
+    "Thaldena":                  { alert: 3.0, minor: 4.0,  major: 5.0,  maxScale: 7.5,  unit: "m" },
+    "Thanamalwila":              { alert: 4.0, minor: 5.0,  major: 5.5,  maxScale: 7.5,  unit: "m" },
+    "Wellawaya":                 { alert: 4.4, minor: 5.4,  major: 5.9,  maxScale: 8.0,  unit: "m" },
+    "Moragaswewa":               { alert: 4.75, minor: 6.0, major: 7.0,  maxScale: 9.5,  unit: "m" },
+    "Badalgama":                 { alert: 5.0, minor: 6.2,  major: 9.6,  maxScale: 12.0, unit: "m" },
+    "Dunamale":                  { alert: 3.3, minor: 4.4,  major: 5.5,  maxScale: 7.5,  unit: "m" },
+    "Moraketiya":                { alert: 3.0, minor: 5.0,  major: 7.0,  maxScale: 9.5,  unit: "m" },
+    "Kuda Oya":                  { alert: 6.9, minor: 8.4,  major: 8.8,  maxScale: 11.0, unit: "m" },
+    "Katharagama":               { alert: 4.0, minor: 4.6,  major: 6.5,  maxScale: 8.5,  unit: "m" },
+    "Nakkala":                   { alert: 5.0, minor: 6.0,  major: 7.5,  maxScale: 10.0, unit: "m" },
+    "Siyambalanduwa":            { alert: 4.5, minor: 6.0,  major: 7.0,  maxScale: 9.5,  unit: "m" },
+    "Padiyathalawa":             { alert: 4.0, minor: 4.5,  major: 6.0,  maxScale: 8.5,  unit: "m" },
+    "Horowpothana":              { alert: 6.0, minor: 7.5,  major: 10.5, maxScale: 14.0, unit: "m" },
+    "Yaka Wewa":                 { alert: 4.0, minor: 5.0,  major: 6.0,  maxScale: 8.5,  unit: "m" },
+    "Thanthirimale":             { alert: 5.0, minor: 6.8,  major: 7.8,  maxScale: 10.5, unit: "m" },
+    "Galgamuwa":                 { alert: 4.84, minor: 5.94, major: 8.0, maxScale: 11.0, unit: "m" },
+    "Giriulla":                  { alert: 5.5, minor: 6.5,  major: 7.5,  maxScale: 10.0, unit: "m" }
+};
+
+const API_URL = "https://services3.arcgis.com/J7ZFXmR8rSmQ3FGf/arcgis/rest/services/survey123_72977f4e45c2412f8bc7bcd5d9db0c7a_stakeholder/FeatureServer/0/query?where=1%3D1&outFields=basin,gauge,water_level,rain_fall,EditDate&orderByFields=EditDate DESC&f=pjson";
+
+let stationsData = [];     
+let historicalRaw = [];    
+let currentSlide = 0;
+let liveChartInstance = null; 
+
+function checkDayNightProfile() {
+    const currentHour = new Date().getHours();
+    const isDay = currentHour >= 6 && currentHour < 18;
+    document.body.classList.toggle("day-mode", isDay);
+}
+
+/* ================= LIVE STREAM DATA FETCH ENGINE ================= */
+async function loadData(){
+    checkDayNightProfile();
+    try {
+        const response = await fetch(API_URL + "&_t=" + Date.now());
+        const data = await response.json();
+
+        if(!data.features || data.features.length === 0) return;
+
+        historicalRaw = data.features; 
+
+        const latestStations = {};
+        data.features.forEach(f => {
+            const a = f.attributes;
+            if(!a.basin || !a.gauge) return;
+
+            let gaugeName = a.gauge.trim();
+            if (gaugeName.toLowerCase() === "pera" || gaugeName.toLowerCase() === "peradeniya") {
+                gaugeName = "Peradeniya";
+                a.gauge = "Peradeniya";
+            }
+
+            if(!latestStations[gaugeName] || a.EditDate > latestStations[gaugeName].EditDate){
+                latestStations[gaugeName] = a;
+            }
+        });
+
+        let rawList = Object.values(latestStations);
+
+        rawList.sort((a, b) => {
+            const basinA = a.basin.replace(/basin/gi, "").trim().toLowerCase();
+            const basinB = b.basin.replace(/basin/gi, "").trim().toLowerCase();
+            if (basinA !== basinB) return basinA.localeCompare(basinB); 
+            return a.gauge.trim().localeCompare(b.gauge.trim());
+        });
+
+        stationsData = rawList;
+
+        if(stationsData.length > 0){
+            const latest = new Date(data.features[0].attributes.EditDate);
+            document.getElementById("updateTime").innerText = latest.toLocaleTimeString("en-GB");
+        }
+        renderSlide();
+    } catch(err) {
+        console.error("Data Stream Synch Fault:", err);
+    }
+}
+
+/* ================= VECTOR SPEEDOMETER MATH TRANSFORMATIONS ================= */
+function describeArc(x, y, radius, startAngle, endAngle){
+    const start = polarToCartesian(x, y, radius, endAngle);
+    const end = polarToCartesian(x, y, radius, startAngle);
+    const largeArcFlag = endAngle - startAngle <= 180 ? "0" : "1";
+    return ["M", start.x, start.y, "A", radius, radius, 0, largeArcFlag, 0, end.x, end.y].join(" ");
+}
+
+function polarToCartesian(centerX, centerY, radius, angleInDegrees) {
+    const angleInRadians = (angleInDegrees-90) * Math.PI / 180.0;
+    return {
+        x: centerX + (radius * Math.cos(angleInRadians)),
+        y: centerY + (radius * Math.sin(angleInRadians))
+    };
+}
+
+/* ================= REAL-TIME SLIDE MATRIX GENERATION ================= */
+function renderSlide(){
+    if(stationsData.length === 0) return;
+
+    const st = stationsData[currentSlide];
+    let cleanRiverName = st.basin.replace(/basin/gi, "").trim();
+    document.getElementById("basinTitleHeader").innerText = cleanRiverName;
+
+    let lookupKey = st.gauge;
+    if (st.gauge.includes("Kalawellawa")) lookupKey = "Kalawellawa (Millakanda)";
+
+    const hasGauge = thresholds.hasOwnProperty(lookupKey);
+    const th = thresholds[lookupKey] || { alert: 0, minor: 0, major: 0, maxScale: 10.0, unit: "m" };
+
+    let levelClass = "normal-level";
+    if (!hasGauge) {
+        levelClass = "no-gauge-level";
+    } else if(th.major > 0 && st.water_level >= th.major){
+        levelClass = "major-level";
+    } else if(th.minor > 0 && st.water_level >= th.minor){
+        levelClass = "minor-level";
+    } else if(th.alert > 0 && st.water_level >= th.alert){
+        levelClass = "alert-level";
+    }
+
+    let mainStationHTML = `<div class="station-main-name ${levelClass}">${st.gauge}</div>`;
+    if (st.gauge.includes("Kalawellawa")) {
+        mainStationHTML = `
+            <div class="station-main-name ${levelClass}">Kalawellawa</div>
+            <div class="station-sub-name">Millakanda</div>
+        `;
+    }
+
+    const maxVal = th.maxScale;
+    const cx = 270; const cy = 260; const arcRadius = 200;
+
+    const angAlert = hasGauge ? (-90 + (th.alert / maxVal) * 180) : -45;
+    const angMinor = hasGauge ? (-90 + (th.minor / maxVal) * 180) : 0;
+    const angMajor = hasGauge ? (-90 + (th.major / maxVal) * 180) : 45;
+    
+    const pct = Math.min(Math.max(st.water_level / maxVal, 0), 1);
+    const needleAngle = hasGauge ? (-90 + (pct * 180)) : -90; 
+
+    const pNormal = polarToCartesian(cx, cy, arcRadius, (-90 + angAlert) / 2);
+    const pAlert  = polarToCartesian(cx, cy, arcRadius, (angAlert + angMinor) / 2);
+    const pMinor  = polarToCartesian(cx, cy, arcRadius, (angMinor + angMajor) / 2);
+    const pMajor  = polarToCartesian(cx, cy, arcRadius, (angMajor + 90) / 2);
+
+    const lineAlert = polarToCartesian(cx, cy, 242, angAlert);
+    const lineMinor = polarToCartesian(cx, cy, 242, angMinor);
+    const lineMajor = polarToCartesian(cx, cy, 242, angMajor);
+
+    /* ===== DELTA TREND CALCULATION MODULE ===== */
+    let trendHTML = `<span class="trend-badge trend-stable">■ Stable</span>`;
+    
+    const matchingHistory = historicalRaw
+        .filter(f => {
+            let name = f.attributes.gauge ? f.attributes.gauge.trim() : "";
+            if (name.toLowerCase() === "pera" || name.toLowerCase() === "peradeniya") name = "Peradeniya";
+            return name === st.gauge;
+        })
+        .sort((a, b) => a.attributes.EditDate - b.attributes.EditDate);
+
+    if (hasGauge && matchingHistory.length > 1) {
+        const currentWaterLevel = st.water_level;
+        const previousWaterLevel = matchingHistory[matchingHistory.length - 2].attributes.water_level;
+        
+        if (currentWaterLevel > previousWaterLevel) {
+            trendHTML = `<span class="trend-badge trend-raising"><i class="fa-solid fa-arrow-trend-up"></i> Raising</span>`;
+        } else if (currentWaterLevel < previousWaterLevel) {
+            trendHTML = `<span class="trend-badge trend-reducing"><i class="fa-solid fa-arrow-trend-down"></i> Reducing</span>`;
+        }
+    }
+
+    /* ===== METRIC RAINFALL PROCESSING ELEMENT ===== */
+    let hourlyRainDisplay = "0.0";
+    let dailyRainDisplay = "0.0";
+    const isNagalagam = st.gauge.toLowerCase().includes("nagalagam");
+
+    if (st.rain_fall === undefined || st.rain_fall === null || st.rain_fall === "" || Number(st.rain_fall) < 0 || isNagalagam) {
+        hourlyRainDisplay = "NA";  dailyRainDisplay = "NA";
+    } else {
+        hourlyRainDisplay = Number(st.rain_fall) === 0 ? "0.0" : Number(st.rain_fall).toFixed(1);
+
+        let rainSum24h = 0;
+        const currentStationTime = st.EditDate;
+        const indexCutoff24h = currentStationTime - (24 * 60 * 60 * 1000);
+
+        historicalRaw.forEach(f => {
+            const histAttr = f.attributes;
+            let histName = histAttr.gauge ? histAttr.gauge.trim() : "";
+            if (histName.toLowerCase() === "pera" || histName.toLowerCase() === "peradeniya") histName = "Peradeniya";
+
+            if (histName === st.gauge && histAttr.EditDate > indexCutoff24h && histAttr.EditDate <= currentStationTime) {
+                if (histAttr.rain_fall !== undefined && histAttr.rain_fall !== null && Number(histAttr.rain_fall) >= 0) {
+                    rainSum24h += Number(histAttr.rain_fall);
+                }
+            }
+        });
+        dailyRainDisplay = rainSum24h === 0 ? "0.0" : rainSum24h.toFixed(1);
+    }
+
+    let waterLevelDisplay = Number(st.water_level).toFixed(2);
+    let unitDisplay = `<span class="unit">${th.unit}</span>`;
+    if(!hasGauge) { waterLevelDisplay = "No Gauge"; unitDisplay = ""; trendHTML = ""; }
+
+    document.getElementById("dashboard").innerHTML = `
+    <div class="card">
+        <div class="station-container">
+            ${mainStationHTML}
+        </div>
+        
+        <div class="content">
+            <div class="left-block">
+                <div class="gauge-container">
+                    <svg class="gauge-svg" viewBox="0 0 540 270">
+                        <path d="${describeArc(cx, cy, arcRadius, -90, angAlert)}" fill="none" stroke="${hasGauge ? 'var(--green)' : 'var(--gauge-empty-arc)'}" stroke-width="66"/>
+                        <path d="${describeArc(cx, cy, arcRadius, angAlert, angMinor)}" fill="none" stroke="${hasGauge ? 'var(--yellow)' : 'var(--gauge-empty-arc)'}" stroke-width="66"/>
+                        <path d="${describeArc(cx, cy, arcRadius, angMinor, angMajor)}" fill="none" stroke="${hasGauge ? 'var(--amber)' : 'var(--gauge-empty-arc)'}" stroke-width="66"/>
+                        <path d="${describeArc(cx, cy, arcRadius, angMajor, 90)}" fill="none" stroke="${hasGauge ? 'var(--red)' : 'var(--gauge-empty-arc)'}" stroke-width="66"/>
+
+                        ${hasGauge ? `
+                        <line x1="${cx}" y1="${cy}" x2="${lineAlert.x}" y2="${lineAlert.y}" stroke="#000" stroke-width="2" stroke-dasharray="4,4"/>
+                        <rect x="${lineAlert.x - 26}" y="${lineAlert.y - 26}" width="52" height="24" class="gauge-bg-badge" />
+                        <text x="${lineAlert.x}" y="${lineAlert.y - 13}" class="gauge-text gauge-val-marker" fill="var(--th-txt-normal)">${th.alert.toFixed(1)}</text>
+                        
+                        <line x1="${cx}" y1="${cy}" x2="${lineMinor.x}" y2="${lineMinor.y}" stroke="#000" stroke-width="2" stroke-dasharray="4,4"/>
+                        <rect x="${lineMinor.x - 26}" y="${lineMinor.y - 28}" width="52" height="24" class="gauge-bg-badge" />
+                        <text x="${lineMinor.x}" y="${lineMinor.y - 15}" class="gauge-text gauge-val-marker" fill="var(--th-txt-minor)">${th.minor.toFixed(1)}</text>
+                        
+                        <line x1="${cx}" y1="${cy}" x2="${lineMajor.x}" y2="${lineMajor.y}" stroke="#000" stroke-width="2" stroke-dasharray="4,4"/>
+                        <rect x="${lineMajor.x - 26}" y="${lineMajor.y - 26}" width="52" height="24" class="gauge-bg-badge" />
+                        <text x="${lineMajor.x}" y="${lineMajor.y - 13}" class="gauge-text gauge-val-marker" fill="var(--th-txt-major)">${th.major.toFixed(1)}</text>
+                        ` : ''}
+
+                        <text x="${pNormal.x}" y="${pNormal.y}" class="gauge-text">${hasGauge ? 'Normal' : 'N/A'}</text>
+                        <text x="${pAlert.x}" y="${pAlert.y}" class="gauge-text">${hasGauge ? 'Alert' : 'N/A'}</text>
+                        <text x="${pMinor.x}" y="${pMinor.y}" class="gauge-text">${hasGauge ? 'Minor' : 'N/A'}</text>
+                        <text x="${pMajor.x}" y="${pMajor.y}" class="gauge-text">${hasGauge ? 'Major' : 'N/A'}</text>
+
+                        <line x1="${cx}" y1="${cy}" x2="${cx}" y2="30" class="gauge-needle-line" style="transform: rotate(${needleAngle}deg);"/>
+                        <circle cx="${cx}" cy="${cy}" r="15" class="gauge-pivot-circle"/>
+                    </svg>
+                </div>
+
+                <div class="water-level-data-block">
+                    <div class="water-level-label-wrapper">
+                        <div class="water-level-label">Water Level Status</div>
+                        ${trendHTML}
+                    </div>
+                    <div class="water-level ${levelClass}">
+                        ${waterLevelDisplay}${unitDisplay}
+                    </div>
+                </div>
+            </div>
+
+            <div class="right-block">
+                <div class="graph-container-box">
+                    <canvas id="stationTrendChart"></canvas>
+                </div>
+
+                <div class="bottom-rain-row">
+                    <div class="rain-box">
+                        <div class="rain-details">
+                            <div class="rain-title">Rainfall</div>
+                            <div class="rain-subtitle">Hourly Value</div>
+                        </div>
+                        <div class="rain-icon"><i class="fa-solid fa-cloud-sun-rain"></i></div>
+                        <div class="rain-value-wrapper">
+                            <span class="rain-value">${hourlyRainDisplay}</span>
+                            ${hourlyRainDisplay !== "NA" ? `<span class="rain-unit">mm</span>` : ""}
+                        </div>
+                    </div>
+
+                    <div class="rain-box">
+                        <div class="rain-details">
+                            <div class="rain-title">Rainfall</div>
+                            <div class="rain-subtitle">Last 24 Hours</div>
+                        </div>
+                        <div class="rain-icon"><i class="fa-solid fa-cloud-showers-heavy"></i></div>
+                        <div class="rain-value-wrapper">
+                            <span class="rain-value">${dailyRainDisplay}</span>
+                            ${dailyRainDisplay !== "NA" ? `<span class="rain-unit">mm</span>` : ""}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    `;
+
+    /* ===== INITIALIZE HISTORICAL GRAPH RENDER INSTANCE WITH RAINFALL OVERLAY ===== */
+    buildHistoricalGraph(matchingHistory, th, hasGauge, st.gauge);
+
+    currentSlide = (currentSlide + 1) % stationsData.length;
+}
+
+/* ================= CHART.JS LIVE DUAL AXIS UPGRADED ENGINE ================= */
+function buildHistoricalGraph(historyRecords, th, hasGauge, currentGaugeName) {
+    const canvasContext = document.getElementById('stationTrendChart').getContext('2d');
+    
+    // UPGRADE 1: Filter exactly for the last 4 days of data based on the latest record timestamp
+    let viewRecords = historyRecords;
+    if (historyRecords.length > 0) {
+        const latestTime = historyRecords[historyRecords.length - 1].attributes.EditDate;
+        const fourDaysAgo = latestTime - (4 * 24 * 60 * 60 * 1000); // 4 days in ms
+        viewRecords = historyRecords.filter(r => r.attributes.EditDate >= fourDaysAgo);
+    }
+    
+    // Safety fallback loop for stations with low frequency feeds
+    if (viewRecords.length < 5) {
+        viewRecords = historyRecords.slice(-20);
+    }
+
+    // UPGRADE 2: Structured X-Axis Date & Time strings for outdoor wall display clarity
+    const chartLabels = viewRecords.map(r => {
+        const d = new Date(r.attributes.EditDate);
+        const day = d.getDate();
+        const month = d.toLocaleString('en-US', { month: 'short' });
+        const hours = String(d.getHours()).padStart(2, '0');
+        const minutes = String(d.getMinutes()).padStart(2, '0');
+        return `${day} ${month} ${hours}:${minutes}`;
+    });
+    
+    const waterDataPoints = viewRecords.map(r => r.attributes.water_level);
+    
+    const rainDataPoints = viewRecords.map(r => {
+        const rf = r.attributes.rain_fall;
+        return (rf === undefined || rf === null || Number(rf) < 0 || currentGaugeName.toLowerCase().includes("nagalagam")) ? 0 : Number(rf);
+    });
+    
+    const dynamicTextColor = document.body.classList.contains("day-mode") ? "#000000" : "#ffffff";
+    const graphGridColor = document.body.classList.contains("day-mode") ? "rgba(0,0,0,0.15)" : "rgba(255,255,255,0.12)";
+
+    if (liveChartInstance) {
+        liveChartInstance.destroy();
+    }
+
+    const benchmarkLines = [];
+    if (hasGauge) {
+        if(th.alert > 0) benchmarkLines.push({ value: th.alert, color: '#ffd400', label: 'Alert' });
+        if(th.minor > 0) benchmarkLines.push({ value: th.minor, color: '#ff9100', label: 'Minor' });
+        if(th.major > 0) benchmarkLines.push({ value: th.major, color: '#ff1744', label: 'Major' });
+    }
+
+    liveChartInstance = new Chart(canvasContext, {
+        data: {
+            labels: chartLabels,
+            datasets: [
+                {
+                    type: 'line',
+                    label: 'Water Level',
+                    data: waterDataPoints,
+                    // UPGRADE 3: Robust Highlighted Curve Geometry Configurations
+                    borderColor: '#11dfff', 
+                    borderWidth: 5, // Thick curve profile
+                    pointRadius: viewRecords.length > 40 ? 2.5 : 4, // Prevents pixel mash over extended ranges
+                    pointBackgroundColor: '#ffffff',
+                    pointBorderColor: '#00bfff',
+                    pointBorderWidth: 2,
+                    backgroundColor: 'rgba(17, 223, 255, 0.16)', // Deep luminous translucent fill
+                    fill: true,
+                    tension: 0.15,
+                    yAxisID: 'y',
+                    order: 1 // Layers the curve beautifully over the background bars
+                },
+                {
+                    type: 'bar',
+                    label: 'Hourly Rainfall',
+                    data: rainDataPoints,
+                    backgroundColor: 'rgba(255, 212, 0, 0.35)',
+                    borderColor: '#ffd400',
+                    borderWidth: 1,
+                    yAxisID: 'y1',
+                    barPercentage: 0.5,
+                    order: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { 
+                    display: true,
+                    position: 'top',
+                    labels: {
+                        color: dynamicTextColor,
+                        font: { size: 13, weight: 'bold' }
+                    }
+                },
+                tooltip: { enabled: true }
+            },
+            scales: {
+                x: {
+                    grid: { color: graphGridColor },
+                    ticks: { 
+                        color: dynamicTextColor, 
+                        font: { size: 11, weight: 'bold' },
+                        maxRotation: 45,
+                        minRotation: 0,
+                        autoSkip: true,
+                        maxTicksLimit: 12 // Keeps tick columns legible over a 96-hour period
+                    }
+                },
+                y: {
+                    type: 'linear',
+                    display: true,
+                    position: 'left',
+                    grid: { color: graphGridColor },
+                    ticks: { color: '#11dfff', font: { size: 13, weight: 'bold' } },
+                    suggestedMax: hasGauge ? th.maxScale : undefined,
+                    title: {
+                        display: true,
+                        text: hasGauge ? `Water Level (${th.unit})` : 'Water Level',
+                        color: '#11dfff',
+                        font: { size: 13, weight: 'bold' }
+                    }
+                },
+                y1: {
+                    type: 'linear',
+                    display: true,
+                    position: 'right',
+                    grid: { drawOnChartArea: false }, // Avoids axis line grid visual conflicts
+                    ticks: { color: '#ffd400', font: { size: 13, weight: 'bold' } },
+                    suggestedMin: 0,
+                    suggestedMax: 20,
+                    title: {
+                        display: true,
+                        text: 'Rainfall (mm)',
+                        color: '#ffd400',
+                        font: { size: 13, weight: 'bold' }
+                    }
+                }
+            }
+        },
+        plugins: [{
+            id: 'horizontalThresholdLines',
+            afterDraw: (chart) => {
+                const { ctx, chartArea: { left, right }, scales: { y } } = chart;
+                ctx.save();
+                benchmarkLines.forEach(line => {
+                    const pixelY = y.getPixelForValue(line.value);
+                    if (pixelY >= chart.chartArea.top && pixelY <= chart.chartArea.bottom) {
+                        ctx.strokeStyle = line.color;
+                        ctx.lineWidth = 3;
+                        ctx.setLineDash([6, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(left, pixelY);
+                        ctx.lineTo(right, pixelY);
+                        ctx.stroke();
+                        
+                        ctx.fillStyle = line.color;
+                        ctx.font = 'bold 12px Segoe UI';
+                        ctx.textAlign = 'right';
+                        ctx.fillText(line.label + ' (' + line.value + ')', right - 8, pixelY - 5);
+                    }
+                });
+                ctx.restore();
+            }
+        }]
+    });
+}
+
+/* ================= ROTATION METRONOME ENGINE ================= */
+function startSlider(){
+    if(stationsData.length === 0){
+        setTimeout(startSlider, 5000);
+        return;
+    }
+
+    renderSlide();
+    
+    const currentStation = stationsData[currentSlide];
+    let interval = 5000;
+    if(currentStation && currentStation.gauge.toLowerCase().includes("nagalagam")){
+        interval = 10000;
+    }
+    
+    setTimeout(startSlider, interval);
+}
+
+/* ================= ENGINE START CHECKS ================= */
+loadData();
+setInterval(loadData, 60000); 
+setTimeout(startSlider, 3000);
+</script>
+
+</body>
+</html>
